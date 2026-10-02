@@ -9,6 +9,12 @@ const route = useRoute()
 const store = useImpositionStore()
 const mobileOpen = ref(false)
 const title = computed(() => String(route.meta.title ?? '拼版工作台'))
+const statusText = computed(() => {
+  if (!store.currentSnapshot) return `${store.validations.length} 项预检提示`
+  if (store.releaseState === '已放行') return '基线已审批放行'
+  if (store.releaseState === '已失效') return '放行已失效 · 等待重新确认'
+  return '快照已定格 · 待放行'
+})
 const nav = [
   { to: '/', label: '生产总览', icon: 'pi pi-chart-pie' },
   { to: '/imposition', label: '拼版工作区', icon: 'pi pi-th-large' },
@@ -27,8 +33,8 @@ const nav = [
         <RouterLink v-for="item in nav" :key="item.to" :to="item.to" @click="mobileOpen = false"><i :class="item.icon" />{{ item.label }}</RouterLink>
       </nav>
       <div class="sidebar-status">
-        <div><span :class="{ warn: !store.locked }" />{{ store.locked ? '基线已审批锁定' : `${store.validations.length} 项预检提示` }}</div>
-        <small>版本 {{ store.revision }} · 自动保存草稿</small>
+        <div><span :class="{ warn: store.releaseState !== '已放行' }" />{{ statusText }}</div>
+        <small>版本 {{ store.revision }} · {{ store.blockedTasks.length ? `${store.blockedTasks.length} 个导出待确认` : '自动保存草稿' }}</small>
       </div>
     </aside>
     <main><RouterView /></main>

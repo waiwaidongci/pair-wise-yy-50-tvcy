@@ -3,25 +3,36 @@ import { computed } from 'vue'
 import Button from 'primevue/button'
 import ProgressBar from 'primevue/progressbar'
 import Tag from 'primevue/tag'
+import Message from 'primevue/message'
 import { useImpositionStore } from '../stores/imposition'
 
 const store = useImpositionStore()
 const errors = computed(() => store.validations.filter((item) => item.severity === '错误').length)
 const pendingProof = computed(() => store.proofs.find((proof) => proof.decision === '待决定'))
+const blockedCount = computed(() => store.blockedTasks.length)
+const releaseSeverity = computed(() => store.releaseState === '已放行' ? 'success' : store.releaseState === '已失效' ? 'danger' : 'warn')
 </script>
 
 <template>
   <section class="page">
     <div class="page-head">
-      <div><p class="eyebrow">PRINT PRODUCTION / 印刷生产</p><h1>拼版预检与打样总览</h1><p class="muted">在当前拼版版本进入生产前，集中处理页序、出血、色彩与装订风险。</p></div>
+      <div><p class="eyebrow">PRINT PRODUCTION / 印刷生产</p><h1>拼版预检与打样总览</h1><p class="muted">拼版、打样与交付包绑定同一份只读版本快照，放行失效时导出停下等待重新确认。</p></div>
       <div class="actions"><Button label="运行完整预检" icon="pi pi-check-circle" outlined /><Button label="进入拼版工作区" icon="pi pi-th-large" @click="$router.push('/imposition')" /></div>
     </div>
+
+    <Message :severity="releaseSeverity" :closable="false" class="mb-3">
+      <strong>快照放行状态：{{ store.releaseState }}</strong>
+      <template v-if="store.currentSnapshot"> · 快照 {{ store.currentSnapshot.revision }} 于 {{ new Date(store.currentSnapshot.lockedAt).toLocaleString('zh-CN') }} 定格</template>
+      <template v-if="store.releaseState === '已失效'"> · {{ store.currentSnapshot?.invalidationReason }}，{{ blockedCount }} 个导出已停下等待重新确认。</template>
+      <template v-else-if="store.releaseState === '已放行'"> · 打样已对版放行，可创建交付包。</template>
+      <template v-else> · 锁定并通过打样后才会放行导出。</template>
+    </Message>
 
     <div class="metric-grid">
       <article class="metric"><span>页面文件</span><strong>{{ store.pages.length }}</strong><small>{{ store.positions.length }} 个已排版位</small></article>
       <article class="metric"><span>预检错误</span><strong class="error">{{ errors }}</strong><small>必须处理后方可锁定</small></article>
       <article class="metric"><span>打样轮次</span><strong>{{ store.proofs.length }}</strong><small>当前 ΔE {{ pendingProof?.deltaE ?? '—' }}</small></article>
-      <article class="metric"><span>待恢复导出</span><strong>{{ store.tasks.filter((task) => task.resumable && task.status !== '已完成').length }}</strong><small>断点可继续</small></article>
+      <article class="metric"><span>待恢复导出</span><strong>{{ store.tasks.filter((task) => task.resumable && task.status !== '已完成').length }}</strong><small v-if="blockedCount">{{ blockedCount }} 个因放行失效已停下</small><small v-else>断点可继续</small></article>
     </div>
 
     <div class="overview-grid">
@@ -70,6 +81,7 @@ const pendingProof = computed(() => store.proofs.find((proof) => proof.decision 
 
 <style scoped>
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.mb-3 { margin-bottom: 12px; }
 .metric .error { color: #b84e35; }
 .overview-grid { display: grid; grid-template-columns: minmax(0,1fr) 350px; gap: 14px; align-items: start; }
 .project-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px; }

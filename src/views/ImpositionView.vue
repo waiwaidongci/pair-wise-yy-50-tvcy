@@ -46,6 +46,8 @@ function locate(pageNo?: number) {
       <span class="muted">缩放 {{ store.zoom }}%</span>
       <Slider v-model="store.zoom" :min="35" :max="100" :step="5" style="width:150px" />
       <span class="paper-spec">720 × 1020mm · 出血 3mm · 安全区 5mm · {{ store.locked ? '基线只读' : '编辑中' }}</span>
+      <Tag v-if="store.currentSnapshot" :value="`快照 ${store.currentSnapshot.revision} · ${store.releaseState}`" :severity="store.releaseState === '已放行' ? 'success' : store.releaseState === '已失效' ? 'danger' : 'warn'" />
+      <Tag v-if="store.currentSnapshot" :value="`定格 ${store.currentSnapshot.validations.length} 项预检`" severity="info" />
       <Button v-if="!store.locked" label="审批锁定" icon="pi pi-lock" size="small" @click="store.lockBaseline" />
       <Button v-else label="解锁修订" icon="pi pi-lock-open" size="small" severity="warn" outlined @click="store.unlock" />
     </div>

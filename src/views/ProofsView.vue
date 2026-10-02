@@ -6,6 +6,7 @@ import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
+import Message from 'primevue/message'
 import { useImpositionStore, type Proof } from '../stores/imposition'
 
 const store = useImpositionStore()
@@ -13,6 +14,18 @@ const active = computed(() => store.proofs.find((proof) => proof.id === store.se
 const draft = ref<Proof>({ ...active.value })
 watch(active, (value) => (draft.value = { ...value }), { immediate: true })
 const sampleFile = ref('当前使用数字样张 v2_09025.tif')
+
+const releaseSeverity = computed(() => store.releaseState === '已放行' ? 'success' : store.releaseState === '已失效' ? 'danger' : 'warn')
+const releaseText = computed(() => {
+  if (!store.currentSnapshot) return '尚未锁定拼版快照，打样通过将在锁定后对版定格。'
+  if (store.releaseState === '已放行') return `当前快照 ${store.currentSnapshot.revision} 已放行，可创建交付包。`
+  if (store.releaseState === '已失效') return `当前快照 ${store.currentSnapshot.revision} 放行已失效：${store.currentSnapshot.invalidationReason}。导出已停下，需重新放行。`
+  return `当前快照 ${store.currentSnapshot.revision} 待放行，打样通过后即对版定格。`
+})
+
+function snapshotRevisionOf(proof: Proof): string | null {
+  return proof.snapshotId ? store.snapshotById(proof.snapshotId)?.revision ?? null : null
+}
 
 function save() {
   store.updateProof(draft.value.id, draft.value)
@@ -26,6 +39,10 @@ function save() {
       <Button label="新建打样轮次" icon="pi pi-plus" @click="store.createProof" />
     </div>
 
+    <Message :severity="releaseSeverity" :closable="false" class="mb-3">
+      <strong>快照放行状态：{{ store.releaseState }}</strong> · {{ releaseText }}
+    </Message>
+
     <div class="proof-layout">
       <section class="panel">
         <div class="panel-head"><h3>打样轮次</h3><Tag :value="`${store.proofs.length} 轮`" /></div>
@@ -34,6 +51,8 @@ function save() {
             <div><strong>第 {{ proof.round }} 轮 · {{ proof.sample }}</strong><small>{{ proof.date }} · {{ proof.owner }}</small></div>
             <span>ΔE {{ proof.deltaE }}</span>
             <Tag :value="proof.decision" :severity="proof.decision === '通过' ? 'success' : proof.decision === '退回' ? 'danger' : 'warn'" />
+            <small v-if="snapshotRevisionOf(proof)" class="bound-snapshot">已对版 {{ snapshotRevisionOf(proof) }}</small>
+            <small v-else-if="proof.decision === '通过'" class="bound-snapshot unbound">未绑定快照</small>
           </button>
         </div>
       </section>
@@ -45,7 +64,11 @@ function save() {
             <div class="print-sample"><span>P1 / P8</span><strong>潮汐来信</strong><i>数字样张色靶</i></div>
             <div>
               <strong>{{ sampleFile }}</strong>
-              <p>样张文件已关联当前拼版版本 {{ store.revision }}，包含 P1、P3、P7、P8 重点页面。</p>
+              <p>样张文件已关联{{ store.currentSnapshot ? `当前快照 ${store.currentSnapshot.revision}` : '当前拼版草稿（未锁定）' }}，包含 P1、P3、P7、P8 重点页面。</p>
+              <p v-if="store.currentSnapshot" class="bind-note">
+                <i class="pi pi-link" />
+                {{ draft.decision === '通过' ? '本次「通过」将对版当前快照并放行。' : '选择「通过」即对版当前快照 ' + store.currentSnapshot.revision + ' 并放行；放行后补录或修改打样会使放行失效。' }}
+              </p>
               <label class="file-button"><i class="pi pi-upload" /> 替换样张照片<input type="file" accept="image/*,.pdf,.tif" style="display:none" @change="sampleFile = ($event.target as HTMLInputElement).files?.[0]?.name ?? sampleFile" /></label>
             </div>
           </div>
@@ -78,13 +101,17 @@ function save() {
 
 <style scoped>
 .proof-layout { display: grid; grid-template-columns: 350px minmax(0,1fr) 300px; gap: 14px; align-items: start; }
+.mb-3 { margin-bottom: 12px; }
 .proof-list { padding: 8px; }
-.proof-list button { display: grid; width: 100%; grid-template-columns: 1fr 58px auto; gap: 8px; align-items: center; padding: 11px; border: 0; border-radius: 7px; text-align: left; background: transparent; cursor: pointer; }
+.proof-list button { display: grid; width: 100%; grid-template-columns: 1fr 58px auto; gap: 4px 8px; align-items: center; padding: 11px; border: 0; border-radius: 7px; text-align: left; background: transparent; cursor: pointer; }
 .proof-list button.active { background: #edf5f4; box-shadow: inset 3px 0 #337b79; }
 .proof-list strong, .proof-list small { display: block; }
 .proof-list strong { font-size: 12px; }
 .proof-list small { margin-top: 4px; color: #7a878e; font-size: 10px; }
 .proof-list > button > span { color: #506f75; font-family: monospace; font-weight: 700; }
+.bound-snapshot { grid-column: 1 / -1; margin-top: 2px; color: #397d64 !important; font-size: 10px; }
+.bound-snapshot.unbound { color: #b84e35 !important; }
+.bind-note { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: #38666d !important; font-size: 11px; }
 .proof-body { display: grid; gap: 15px; padding: 18px; }
 .sample-preview { display: grid; grid-template-columns: 190px 1fr; gap: 16px; align-items: center; padding: 14px; background: #f4f6f5; }
 .print-sample { position: relative; display: grid; width: 150px; aspect-ratio: .72; place-items: center; padding: 12px; color: #dce9e8; background: linear-gradient(145deg,#173a4a,#306a6d); box-shadow: 0 8px 18px rgba(29,54,62,.18); }
