@@ -45,7 +45,8 @@ function locate(pageNo?: number) {
       <SelectButton v-model="store.side" :options="sideOptions" optionLabel="label" optionValue="value" />
       <span class="muted">缩放 {{ store.zoom }}%</span>
       <Slider v-model="store.zoom" :min="35" :max="100" :step="5" style="width:150px" />
-      <span class="paper-spec">720 × 1020mm · 出血 3mm · 安全区 5mm · {{ store.locked ? '基线只读' : '编辑中' }}</span>
+      <span class="paper-spec">720 × 1020mm · 出血 3mm · 安全区 5mm · {{ store.locked && store.lockedSnapshot ? `基线 ${store.lockedSnapshot.revision} · 指纹 ${store.lockedSnapshot.fingerprint}` : '编辑中' }}</span>
+      <Tag :value="store.releaseValid ? '放行有效' : store.locked ? '待打样放行' : '未锁定'" :severity="store.releaseValid ? 'success' : store.locked ? 'warn' : 'info'" />
       <Button v-if="!store.locked" label="审批锁定" icon="pi pi-lock" size="small" @click="store.lockBaseline" />
       <Button v-else label="解锁修订" icon="pi pi-lock-open" size="small" severity="warn" outlined @click="store.unlock" />
     </div>

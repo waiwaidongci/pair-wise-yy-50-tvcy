@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
+import Message from 'primevue/message'
 import Textarea from 'primevue/textarea'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
@@ -13,9 +14,17 @@ const active = computed(() => store.proofs.find((proof) => proof.id === store.se
 const draft = ref<Proof>({ ...active.value })
 watch(active, (value) => (draft.value = { ...value }), { immediate: true })
 const sampleFile = ref('当前使用数字样张 v2_09025.tif')
+const approvalHint = ref('')
 
 function save() {
   store.updateProof(draft.value.id, draft.value)
+  if (draft.value.decision !== '通过') {
+    approvalHint.value = ''
+    return
+  }
+  approvalHint.value = store.release?.proofId === draft.value.id
+    ? `已放行：打样通过对应快照 ${store.release.revision}，指纹已绑定。`
+    : '未形成放行：打样通过必须基于当前锁定快照，请先审批锁定且锁定后未再改动内容。'
 }
 </script>
 
@@ -26,12 +35,22 @@ function save() {
       <Button label="新建打样轮次" icon="pi pi-plus" @click="store.createProof" />
     </div>
 
+    <Message v-if="!store.locked" severity="warn" :closable="false" class="mb-3">
+      当前未锁定基线，打样「通过」不会形成放行；请先在拼版工作区审批锁定，使打样对应到只读快照。
+    </Message>
+    <Message v-else-if="store.release" severity="success" :closable="false" class="mb-3">
+      放行有效：{{ store.release.proofId }} 通过，对应快照 {{ store.release.revision }}。放行后补录或修改任何打样记录都会使放行失效、导出暂停。
+    </Message>
+    <Message v-else severity="warn" :closable="false" class="mb-3">
+      尚未形成有效放行：需要一轮「通过」且对应快照 {{ store.lockedSnapshot?.revision }} 的打样记录。
+    </Message>
+
     <div class="proof-layout">
       <section class="panel">
         <div class="panel-head"><h3>打样轮次</h3><Tag :value="`${store.proofs.length} 轮`" /></div>
         <div class="proof-list">
           <button v-for="proof in store.proofs.slice().reverse()" :key="proof.id" :class="{ active: proof.id === store.selectedProof }" @click="store.selectedProof = proof.id">
-            <div><strong>第 {{ proof.round }} 轮 · {{ proof.sample }}</strong><small>{{ proof.date }} · {{ proof.owner }}</small></div>
+            <div><strong>第 {{ proof.round }} 轮 · {{ proof.sample }}</strong><small>{{ proof.date }} · {{ proof.owner }} · 记录于 {{ proof.revision }}<template v-if="proof.approvedRevision"> · 放行 {{ proof.approvedRevision }}</template></small></div>
             <span>ΔE {{ proof.deltaE }}</span>
             <Tag :value="proof.decision" :severity="proof.decision === '通过' ? 'success' : proof.decision === '退回' ? 'danger' : 'warn'" />
           </button>
@@ -45,7 +64,7 @@ function save() {
             <div class="print-sample"><span>P1 / P8</span><strong>潮汐来信</strong><i>数字样张色靶</i></div>
             <div>
               <strong>{{ sampleFile }}</strong>
-              <p>样张文件已关联当前拼版版本 {{ store.revision }}，包含 P1、P3、P7、P8 重点页面。</p>
+              <p>样张文件记录于版本 {{ active?.revision }}，当前锁定快照为 {{ store.lockedSnapshot?.revision ?? '无' }}，包含 P1、P3、P7、P8 重点页面。</p>
               <label class="file-button"><i class="pi pi-upload" /> 替换样张照片<input type="file" accept="image/*,.pdf,.tif" style="display:none" @change="sampleFile = ($event.target as HTMLInputElement).files?.[0]?.name ?? sampleFile" /></label>
             </div>
           </div>
@@ -62,6 +81,7 @@ function save() {
             <Button label="保存打样记录" icon="pi pi-save" @click="save" />
             <Button label="退回修改" icon="pi pi-undo" severity="danger" outlined @click="draft.decision = '退回'; save()" />
           </div>
+          <Message v-if="approvalHint" :severity="store.release?.proofId === draft.id ? 'success' : 'error'" :closable="false">{{ approvalHint }}</Message>
         </div>
       </section>
 
@@ -77,6 +97,7 @@ function save() {
 </template>
 
 <style scoped>
+.mb-3 { margin-bottom: 12px; }
 .proof-layout { display: grid; grid-template-columns: 350px minmax(0,1fr) 300px; gap: 14px; align-items: start; }
 .proof-list { padding: 8px; }
 .proof-list button { display: grid; width: 100%; grid-template-columns: 1fr 58px auto; gap: 8px; align-items: center; padding: 11px; border: 0; border-radius: 7px; text-align: left; background: transparent; cursor: pointer; }

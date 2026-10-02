@@ -21,12 +21,12 @@ const pendingProof = computed(() => store.proofs.find((proof) => proof.decision 
       <article class="metric"><span>页面文件</span><strong>{{ store.pages.length }}</strong><small>{{ store.positions.length }} 个已排版位</small></article>
       <article class="metric"><span>预检错误</span><strong class="error">{{ errors }}</strong><small>必须处理后方可锁定</small></article>
       <article class="metric"><span>打样轮次</span><strong>{{ store.proofs.length }}</strong><small>当前 ΔE {{ pendingProof?.deltaE ?? '—' }}</small></article>
-      <article class="metric"><span>待恢复导出</span><strong>{{ store.tasks.filter((task) => task.resumable && task.status !== '已完成').length }}</strong><small>断点可继续</small></article>
+      <article class="metric"><span>待处理导出</span><strong>{{ store.tasks.filter((task) => task.status === '已中断' || task.status === '待确认').length }}</strong><small>断点可继续</small></article>
     </div>
 
     <div class="overview-grid">
       <section class="panel">
-        <div class="panel-head"><h3>当前拼版任务</h3><Tag :value="store.revision" severity="info" /></div>
+        <div class="panel-head"><h3>当前拼版任务</h3><div class="head-tags"><Tag :value="store.releaseValid ? '放行有效' : '放行未生效'" :severity="store.releaseValid ? 'success' : 'warn'" /><Tag :value="store.revision" severity="info" /></div></div>
         <div class="project-card">
           <div>
             <strong>《潮汐来信》上海巡演节目册</strong>
@@ -70,6 +70,7 @@ const pendingProof = computed(() => store.proofs.find((proof) => proof.decision 
 
 <style scoped>
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.head-tags { display: flex; gap: 6px; }
 .metric .error { color: #b84e35; }
 .overview-grid { display: grid; grid-template-columns: minmax(0,1fr) 350px; gap: 14px; align-items: start; }
 .project-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px; }
